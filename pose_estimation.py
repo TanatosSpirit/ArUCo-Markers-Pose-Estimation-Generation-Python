@@ -10,6 +10,7 @@ import sys
 from utils import ARUCO_DICT
 import argparse
 import time
+import plotly.express as px
 
 
 def pose_esitmation(frame, aruco_dict_type, matrix_coefficients, distortion_coefficients):
@@ -31,20 +32,26 @@ def pose_esitmation(frame, aruco_dict_type, matrix_coefficients, distortion_coef
     corners, ids, rejected_img_points = cv2.aruco.detectMarkers(gray, cv2.aruco_dict,parameters=parameters,
         cameraMatrix=matrix_coefficients,
         distCoeff=distortion_coefficients)
-
+    tvec = np.array([[[]]])
         # If markers are detected
     if len(corners) > 0:
         for i in range(0, len(ids)):
             # Estimate pose of each marker and return the values rvec and tvec---(different from those of camera coefficients)
-            rvec, tvec, markerPoints = cv2.aruco.estimatePoseSingleMarkers(corners[i], 0.02, matrix_coefficients,
+            rvec, tvec, markerPoints = cv2.aruco.estimatePoseSingleMarkers(corners[i], 0.10, matrix_coefficients,
                                                                        distortion_coefficients)
+
+
+
+            kvadrat = np.power(tvec, 2)
+            sum_vec = np.sum(kvadrat)
+            print(np.sqrt(sum_vec))
             # Draw a square around the markers
             cv2.aruco.drawDetectedMarkers(frame, corners) 
 
             # Draw Axis
-            cv2.aruco.drawAxis(frame, matrix_coefficients, distortion_coefficients, rvec, tvec, 0.01)  
+            cv2.aruco.drawAxis(frame, matrix_coefficients, distortion_coefficients, rvec, tvec, 0.10)
 
-    return frame
+    return frame, tvec
 
 if __name__ == '__main__':
 
@@ -69,13 +76,23 @@ if __name__ == '__main__':
     video = cv2.VideoCapture(0)
     time.sleep(2.0)
 
+    x = []
+    y = []
+    z = []
+
     while True:
         ret, frame = video.read()
 
         if not ret:
             break
         
-        output = pose_esitmation(frame, aruco_dict_type, k, d)
+        output, tvec = pose_esitmation(frame, aruco_dict_type, k, d)
+        print(tvec)
+
+        if len(tvec[0][0])>0:
+            x.append(tvec[0][0][0])
+            y.append(tvec[0][0][1])
+            z.append(tvec[0][0][2])
 
         cv2.imshow('Estimated Pose', output)
 
@@ -85,3 +102,28 @@ if __name__ == '__main__':
 
     video.release()
     cv2.destroyAllWindows()
+
+    x_mean = np.mean(x)
+    y_mean = np.mean(y)
+    z_mean = np.mean(z)
+
+    print("x_mean: ", x_mean)
+    print("y_mean: ", y_mean)
+    print("z_mean: ", z_mean)
+
+
+    print("STD_X: ", np.std(x))
+    print("STD_Y: ", np.std(y))
+    print("STD_Z: ", np.std(z))
+
+    x.append(0)
+    y.append(0)
+    z.append(0)
+
+    x = np.array(x)
+    y = np.array(y)
+    z = np.array(z)
+
+    print("Len(x): ", len(x))
+    fig = px.scatter_3d(x=x, y=y, z=z)
+    fig.show()
